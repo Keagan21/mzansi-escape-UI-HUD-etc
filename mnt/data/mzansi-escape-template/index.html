@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mzansi Escape — UI / NPC / Dialogue Template</title>
+  </head>
+  <body>
+    <div id="app">
+      <div class="panel hud">
+        <div id="stage-counter">Stage 1 / 8</div>
+        <div id="level-name">LEVEL 1 — Durban Taxi Rank</div>
+        <div id="objective-text">Objective: Survive the street and reach the checkpoint.</div>
+        <div class="health-wrap">
+          <div id="health-label">Health: 100/100</div>
+          <div class="health-bar"><div id="health-fill"></div></div>
+        </div>
+      </div>
+
+      <div id="hint" class="panel hint hidden"></div>
+      <div id="warning-banner" class="panel warning hidden"></div>
+
+      <div id="dialogue-box" class="panel dialogue hidden">
+        <div class="dialogue-header">
+          <div id="npc-name">NPC</div>
+          <div id="dialogue-instruction">Press E to continue</div>
+        </div>
+        <div id="dialogue-text"></div>
+      </div>
+
+      <div id="crosshair">+</div>
+      <div id="fx-overlay"></div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
