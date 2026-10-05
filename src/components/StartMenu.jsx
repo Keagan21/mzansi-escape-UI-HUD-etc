@@ -15,6 +15,122 @@ import {
 } from '../game/store.js'
 import { ScoreboardsPanel } from './ScoreboardsPanel.jsx'
 
+function MenuIcon({ name, className = 'start-menu__tile-icon' }) {
+  const common = {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.75,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': true,
+    className,
+  }
+  if (name === 'play') {
+    return (
+      <svg {...common}>
+        <polygon points="8,5 19,12 8,19" fill="currentColor" stroke="none" />
+      </svg>
+    )
+  }
+  if (name === 'user') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="8" r="3.2" />
+        <path d="M5.5 19.2c1.2-3 3.4-4.5 6.5-4.5s5.3 1.5 6.5 4.5" />
+      </svg>
+    )
+  }
+  if (name === 'scores') {
+    return (
+      <svg {...common}>
+        <path d="M5 19V11h3.2v8" />
+        <path d="M10.4 19V6h3.2v13" />
+        <path d="M15.8 19v-5H19v5" />
+      </svg>
+    )
+  }
+  if (name === 'help') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M9.6 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.2 2-2.2 3.3" />
+        <path d="M12 16.8h.01" />
+      </svg>
+    )
+  }
+  if (name === 'options') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18" />
+      </svg>
+    )
+  }
+  if (name === 'store') {
+    return (
+      <svg {...common}>
+        <path d="M6 8h12l-1 11H7L6 8z" />
+        <path d="M9 8V6.8A3 3 0 0 1 12 4a3 3 0 0 1 3 2.8V8" />
+      </svg>
+    )
+  }
+  if (name === 'levels') {
+    return (
+      <svg {...common}>
+        <rect x="4" y="4" width="6.5" height="6.5" rx="1.4" />
+        <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.4" />
+        <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.4" />
+        <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.4" />
+      </svg>
+    )
+  }
+  if (name === 'wallet') {
+    return (
+      <svg {...common}>
+        <rect x="3" y="6" width="18" height="13" rx="2" />
+        <path d="M3 10.5h18" />
+        <circle cx="16.2" cy="15" r="1.15" fill="currentColor" stroke="none" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...common}>
+      <path d="M10 6.5V4.5h9v9h-2" />
+      <path d="M4.5 11h8.5" />
+      <path d="M10 7.5 13.5 11 10 14.5" />
+      <path d="M5 8.5v9h7" />
+    </svg>
+  )
+}
+
+function WalletBadge({ balance, store = false }) {
+  return (
+    <p
+      className={
+        'start-menu__wallet-badge' + (store ? ' start-menu__wallet-badge--store' : '')
+      }
+      aria-live="polite"
+    >
+      <MenuIcon name="wallet" className="start-menu__wallet-icon" />
+      <span>Wallet: R {balance}</span>
+    </p>
+  )
+}
+
+function HomeTile({ icon, label, onClick, primary = false }) {
+  return (
+    <button
+      type="button"
+      className={'start-menu__tile' + (primary ? ' start-menu__tile--primary' : '')}
+      onClick={onClick}
+    >
+      <MenuIcon name={icon} />
+      <span className="start-menu__tile-label">{label}</span>
+    </button>
+  )
+}
+
 export function StartMenu({
   menuScreen,
   onBeginGame,
@@ -190,7 +306,7 @@ export function StartMenu({
               </h1>
               <p className="start-menu__edition">STREETS · SOUTH AFRICA</p>
             </header>
-            <nav className="start-menu__nav" aria-label="Main menu">
+            <nav className="start-menu__home" aria-label="Main menu">
               {user ? (
                 <>
                   <p className="start-menu__signed-in" aria-live="polite">
@@ -201,65 +317,37 @@ export function StartMenu({
                   </p>
                 </>
               ) : null}
-              <p className="start-menu__wallet-badge" aria-live="polite">
-                Wallet: R {walletBalance}
-              </p>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={onBeginGame}
-              >
-                New Game
-              </button>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={() => onNavigate('account')}
-              >
-                {user ? 'Account…' : 'Sign In…'}
-              </button>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={() => onNavigate('scoreboards')}
-              >
-                Scoreboards…
-              </button>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={() => onNavigate('instructions')}
-              >
-                How to Play
-              </button>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={() => onNavigate('options')}
-              >
-                Options…
-              </button>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={() => onNavigate('store')}
-              >
-                Store…
-              </button>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={() => onNavigate('levels')}
-              >
-                Levels…
-              </button>
-              <button
-                type="button"
-                className="start-menu__pixel-btn"
-                onClick={onExit}
-              >
-                Quit Game
-              </button>
+              <WalletBadge balance={walletBalance} />
+              <div className="start-menu__home-grid">
+                <HomeTile icon="play" label="New Game" onClick={onBeginGame} primary />
+                <HomeTile
+                  icon="user"
+                  label={user ? 'Account' : 'Sign In'}
+                  onClick={() => onNavigate('account')}
+                />
+                <HomeTile
+                  icon="scores"
+                  label="Scoreboards"
+                  onClick={() => onNavigate('scoreboards')}
+                />
+                <HomeTile
+                  icon="help"
+                  label="How to Play"
+                  onClick={() => onNavigate('instructions')}
+                />
+                <HomeTile
+                  icon="options"
+                  label="Options"
+                  onClick={() => onNavigate('options')}
+                />
+                <HomeTile icon="store" label="Store" onClick={() => onNavigate('store')} />
+                <HomeTile
+                  icon="levels"
+                  label="Levels"
+                  onClick={() => onNavigate('levels')}
+                />
+                <HomeTile icon="quit" label="Quit" onClick={onExit} />
+              </div>
             </nav>
           </>
         )}
@@ -658,9 +746,7 @@ export function StartMenu({
             aria-label="Store"
           >
             <h2 className="start-menu__sub-title">Store</h2>
-            <p className="start-menu__wallet-badge start-menu__wallet-badge--store">
-              Wallet: R {walletBalance}
-            </p>
+            <WalletBadge balance={walletBalance} store />
             <p className="start-menu__options-sub">
               Spend coins collected in any level. Unlocks stay saved on this
               device.

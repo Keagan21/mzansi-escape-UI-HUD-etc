@@ -818,7 +818,7 @@ export function createLevel8Session(deps) {
       }
     }
 
-    navArrow.update(pos, navTarget(beats), { dt })
+    navArrow.update(pos, navTarget(beats), { dt, yaw: Math.PI })
 
     if (Math.hypot(pos.x - LEVEL8_ANCHORS.home.x, pos.z - LEVEL8_ANCHORS.home.z) < LEVEL8_WIN_RADIUS) {
       completeLevel()

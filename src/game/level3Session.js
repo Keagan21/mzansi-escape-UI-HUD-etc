@@ -44,6 +44,7 @@ import {
   updateCollectibleInstances,
 } from './level3Coins.js'
 import { createNavArrow } from './navArrow.js'
+import { createLevel3Ambient } from './level3Ambient.js'
 
 export const LEVEL3_MAX_HP = 100
 export const LEVEL3_PLAYER_HEIGHT = 1.7
@@ -124,6 +125,10 @@ export function createLevel3Session(deps) {
     LEVEL3_BILLBOARD_ADS
   )
   city.colliders.push(...billboards.colliders)
+
+  const cityLife = createLevel3Ambient(city.group, {
+    addCollider: (c) => city.colliders.push(c),
+  })
 
   const coinData = buildLevel3CoinData()
   const coinMeshes = createLevel3CoinMeshes(coinData, new THREE.TextureLoader())
@@ -354,6 +359,7 @@ export function createLevel3Session(deps) {
     }
 
     billboards.update(dt)
+    cityLife.update(dt)
 
     // Update damage flash
     damageFlash = Math.max(0, damageFlash - dt)
@@ -446,7 +452,7 @@ export function createLevel3Session(deps) {
 
     const distToStation = parkStation.getDistanceToGoal(pos.x, pos.z)
     const goal = parkStation.getGoalCenter()
-    navArrow.update(pos, goal, { dt })
+    navArrow.update(pos, goal, { dt, yaw })
     const atStation = parkStation.isAtGoal(pos.x, pos.z)
     let busFareNeeded = 0
     if (atStation) {
@@ -521,6 +527,7 @@ export function createLevel3Session(deps) {
     disposeCoinMeshes(coinMeshes)
     navArrow.dispose()
     billboards.dispose()
+    cityLife.dispose()
     parkStation.group.userData.cancelParkStationLoad?.()
     city.dispose()
     scene.remove(sun.target)

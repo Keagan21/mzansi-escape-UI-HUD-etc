@@ -62,7 +62,7 @@ export function Level6Objective({
               'level6-strikes__stance' + (sprinting ? ' level6-strikes__stance--loud' : '')
             }
           >
-            {sprinting ? 'SPRINTING — making noise' : 'CROUCHED — harder to spot'}
+            {sprinting ? 'SPRINTING' : 'CROUCHED — harder to spot'}
           </p>
         ) : null}
       </div>
@@ -118,7 +118,7 @@ export function Level6Objective({
       </div>
 
       <p className="level6-controls" aria-hidden>
-        C / CTRL — crouch &nbsp;|&nbsp; SHIFT — sprint (makes noise) &nbsp;|&nbsp; WASD — move
+        C / CTRL — crouch &nbsp;|&nbsp; SHIFT — sprint &nbsp;|&nbsp; WASD — move
         &nbsp;|&nbsp; E — read note
       </p>
     </>

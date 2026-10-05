@@ -65,10 +65,10 @@ const BRIEFINGS = {
     title: 'Cape Flats: Stay Hidden',
     setting: 'Cape Flats, late at night',
     goal: 'You cannot fight here. Navigate the Cape Flats without being spotted and reach safety at the Thuthuzela Care Centre.',
-    avoid: 'Faceless patrollers walk the passages. Their red vision cones spot you, and sprinting near them is loud. Three sightings and it is over — each one sends you back to your last checkpoint.',
+    avoid: 'Faceless patrollers walk the passages. You are spotted only while you stand inside a red vision cone. Walls block their view, and crouching behind a car hulk hides you. Three sightings and it is over — each one sends you back to your last checkpoint.',
     collect: 'Read community notes (E) for facts about gender-based violence — find all 8 to cut your time. Rand coins go to your store wallet. Green porch lights mark the safe route.',
     controls:
-      'W A S D: move (camera follows behind you) · C: toggle crouch (or hold Ctrl) · Shift: sprint (makes noise) · E: read a note · P or Esc: pause',
+      'W A S D: move (camera follows behind you) · C: toggle crouch (or hold Ctrl) · Shift: sprint · E: read a note · P or Esc: pause',
   },
   8: {
     title: 'Soweto Homecoming',

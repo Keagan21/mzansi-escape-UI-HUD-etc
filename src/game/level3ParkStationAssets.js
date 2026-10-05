@@ -54,6 +54,7 @@ export function prepareParkStationModel(root) {
     if (o.isMesh) {
       o.castShadow = true
       o.receiveShadow = true
+      o.frustumCulled = false
     }
   })
 
@@ -62,7 +63,13 @@ export function prepareParkStationModel(root) {
   const maxHoriz = Math.max(size.x, size.z, 0.001)
   const s = PARK_STATION_TARGET_SIZE / maxHoriz
   root.scale.setScalar(s)
+  root.position.set(0, 0, 0)
+  root.updateMatrixWorld(true)
 
+  const scaled = new THREE.Box3().setFromObject(root)
+  const center = scaled.getCenter(new THREE.Vector3())
+  root.position.x = -center.x
+  root.position.z = -center.z
   root.updateMatrixWorld(true)
   const grounded = new THREE.Box3().setFromObject(root)
   root.position.y = -grounded.min.y

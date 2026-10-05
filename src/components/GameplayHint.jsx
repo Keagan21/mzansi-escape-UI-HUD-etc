@@ -70,7 +70,7 @@ export function GameplayHint({
       <div className={className} role="status">
         <p className="subway-hint__text">
           Cape Flats · You cannot fight · Stay out of the red vision cones · Walls and
-          crouching behind car hulks hide you · Sprinting is loud · Green porch lights mark
+          crouching behind car hulks hide you · Green porch lights mark
           the safe path · E reads community notes · WASD move · C / Ctrl crouch · Shift
           sprint · P pause · R restart
         </p>

@@ -119,7 +119,6 @@ export const LEVEL6_CROUCH_SPEED = 4
 export const LEVEL6_SPRINT_SPEED = 14
 export const LEVEL6_VISION_RANGE = 22
 export const LEVEL6_VISION_ANGLE = 0.72
-export const LEVEL6_SOUND_RADIUS_SPRINT = 18
 export const LEVEL6_THREAT_COUNT = 6
 export const LEVEL6_WALLET_COIN_COUNT = 20
 export const LEVEL6_COMMUNITY_TIPS = 8

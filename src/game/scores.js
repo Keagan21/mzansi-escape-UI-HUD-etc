@@ -3,12 +3,14 @@
 import {
   collection,
   doc,
+  getDocFromServer,
   getDocs,
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore'
 import { auth, db } from '../firebase.js'
 import { getUserLabel } from './auth.js'
+import { readLocalProgress } from './playerProgress.js'
 import { levelHighScoreKey } from './storageKeys.js'
 import {
   isLevelPlayable,
@@ -78,9 +80,116 @@ function mergeTimeBest(localMs, cloudMs) {
   return times.length ? Math.min(...times) : 0
 }
 
+function playerProfileRef(uid) {
+  return doc(db, 'players', uid)
+}
+
+function newProfilePayload(levelBests) {
+  const progress = readLocalProgress()
+  return {
+    wallet: progress.wallet,
+    unlocks: {
+      characters: [...progress.unlocks.characters],
+      cars: [...progress.unlocks.cars],
+    },
+    selectedCharacterId: progress.selectedCharacterId,
+    selectedLevel2CarId: progress.selectedLevel2CarId,
+    clientUpdatedAt: progress.clientUpdatedAt || Date.now(),
+    updatedAt: serverTimestamp(),
+    levelBests,
+  }
+}
+
+function pickBest(levelId, a, b) {
+  return levelUsesTimeScore(levelId) ? mergeTimeBest(a, b) : Math.max(a || 0, b || 0)
+}
+
+function bestsFromMap(map) {
+  if (!map || typeof map !== 'object') return []
+  const rows = []
+  for (const [id, value] of Object.entries(map)) {
+    const levelId = Number(id)
+    if (!Number.isFinite(levelId) || levelId < 1) continue
+    const bestScore = sanitizeStoredBest(levelId, value?.bestScore)
+    if (bestScore <= 0) continue
+    if (typeof value?.displayName !== 'string' || value.displayName.length === 0) continue
+    rows.push({
+      levelId,
+      bestScore,
+      displayName: typeof value?.displayName === 'string' ? value.displayName : '',
+    })
+  }
+  return rows
+}
+
+/** Personal bests stored on the account profile. This write is allowed today. */
+export async function fetchProfileBests(uid) {
+  if (!uid) return []
+  const snap = await getDocFromServer(playerProfileRef(uid))
+  if (!snap.exists()) return []
+  return bestsFromMap(snap.data().levelBests)
+}
+
+/**
+ * Replace the account's per-level bests. Other profile fields stay put.
+ * @param {string} uid
+ * @param {Array<{ levelId: number, bestScore: number }>} rows
+ * @param {string} displayName
+ */
+async function writeProfileBests(uid, rows, displayName) {
+  const ref = playerProfileRef(uid)
+  const levelBests = {}
+  for (const row of rows) {
+    const levelId = Number(row.levelId)
+    const bestScore = sanitizeStoredBest(levelId, row.bestScore)
+    if (levelId < 1 || bestScore <= 0) continue
+    levelBests[String(levelId)] = {
+      bestScore,
+      scoreKind: levelUsesTimeScore(levelId) ? 'time' : 'points',
+      displayName: displayName || 'Player',
+    }
+  }
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref)
+    if (!snap.exists()) {
+      tx.set(ref, newProfilePayload(levelBests))
+      return
+    }
+    // update replaces the map. set+merge would keep old level keys.
+    tx.update(ref, { levelBests })
+  })
+}
+
+/**
+ * Keep the better of the stored profile best and this run.
+ * @returns {Promise<number>} best now stored, or 0 if the profile is not created yet
+ */
+async function upsertProfileBest(uid, level, incoming, displayName) {
+  const ref = playerProfileRef(uid)
+  let stored = 0
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref)
+    const map = snap.exists() ? { ...(snap.data().levelBests || {}) } : {}
+    const prev = sanitizeStoredBest(level, map[String(level)]?.bestScore)
+    const next = pickBest(level, prev, sanitizeStoredBest(level, incoming))
+    if (next <= 0) return
+    map[String(level)] = {
+      bestScore: next,
+      scoreKind: levelUsesTimeScore(level) ? 'time' : 'points',
+      displayName: displayName || 'Player',
+    }
+    if (!snap.exists()) tx.set(ref, newProfilePayload(map))
+    else tx.update(ref, { levelBests: map })
+    stored = next
+  })
+  return stored
+}
+
 /**
  * Save a personal best if it beats the cloud record.
- * Timed levels (Level 3) use milliseconds and lower-is-better.
+ * Timed levels store milliseconds and lower is better.
+ * The account profile is the record that follows the player between devices.
+ * The public leaderboard is updated as well when rules allow that write.
  * No-op when signed out.
  *
  * @param {number} levelId
@@ -104,8 +213,16 @@ export async function submitBestScore(levelId, score, options = {}) {
   const personalRef = doc(db, 'scores', uid, 'levels', String(level))
   const boardRef = doc(db, 'leaderboards', String(level), 'entries', uid)
 
+  let profileBest = 0
+  try {
+    profileBest = await upsertProfileBest(uid, level, nextScore, displayName)
+  } catch {
+    profileBest = 0
+  }
+
   let updated = false
   let savedBest = 0
+  let boardError = null
   try {
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(personalRef)
@@ -159,20 +276,28 @@ export async function submitBestScore(levelId, score, options = {}) {
       savedBest = best
       updated = true
     })
-  } catch {
-    return { updated: false }
+  } catch (err) {
+    boardError = err
   }
 
-  if (savedBest > 0) {
+  const bestNow = pickBest(level, profileBest, savedBest)
+  if (bestNow > 0) {
     try {
-      localStorage.setItem(levelHighScoreKey(level), String(savedBest))
+      localStorage.setItem(levelHighScoreKey(level), String(bestNow))
     } catch {
       // ignore
     }
-    bumpAccountCacheScore(uid, level, savedBest)
+    bumpAccountCacheScore(uid, level, bestNow)
   }
 
-  return { updated }
+  if (bestNow <= 0) {
+    return {
+      updated: false,
+      error: boardError?.code || 'unknown',
+      message: boardError?.message || 'Could not save this score.',
+    }
+  }
+  return { updated: updated || profileBest > 0 }
 }
 
 /**
@@ -383,6 +508,7 @@ export async function hydrateAccountScores(uid) {
 
   const cachedRows = readAccountScoreCache(uid)
   let cloudRows = []
+  let profileRows = []
   let error = null
 
   try {
@@ -394,7 +520,17 @@ export async function hydrateAccountScores(uid) {
     cloudRows = cachedRows
   }
 
-  const mergedSources = [...cachedRows, ...cloudRows]
+  try {
+    profileRows = await fetchProfileBests(uid)
+  } catch (err) {
+    if (!cloudRows.length) {
+      error =
+        err?.message ||
+        'Could not load cloud scores. Showing saved scores from this device.'
+    }
+  }
+
+  const mergedSources = [...cachedRows, ...cloudRows, ...profileRows]
   const byCloud = new Map()
   for (const row of mergedSources) {
     const levelId = Number(row.levelId)
@@ -423,6 +559,18 @@ export async function hydrateAccountScores(uid) {
     byCloud.set(level, best)
     if (best > 0 && isLevelPlayable(level)) {
       publishes.push(submitBestScore(level, best))
+    }
+  }
+
+  try {
+    await writeProfileBests(
+      uid,
+      [...byCloud.entries()].map(([levelId, bestScore]) => ({ levelId, bestScore })),
+      getUserLabel(auth.currentUser) || 'Player'
+    )
+  } catch (err) {
+    if (!error) {
+      error = err?.message || 'Could not save scores to your account.'
     }
   }
 

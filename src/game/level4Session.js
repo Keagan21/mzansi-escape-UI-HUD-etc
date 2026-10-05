@@ -42,6 +42,7 @@ import { levelHighScoreKey } from './storageKeys.js'
 import { LOW_SPEC_RENDERING, OPEN_WORLD_SHADOW_EXTENT } from './gameConstants.js'
 import { createNavArrow } from './navArrow.js'
 import { resolveForwardAxis } from './movementInput.js'
+import { createLevel4Ambient } from './level4Ambient.js'
 
 export const LEVEL4_MAX_THIRST = 100
 export const LEVEL4_PLAYER_HEIGHT = 1.7
@@ -118,6 +119,11 @@ export function createLevel4Session(deps) {
     LEVEL4_BILLBOARD_ADS
   )
   city.colliders.push(...billboards.colliders)
+
+  const cityLife = createLevel4Ambient(city.group, {
+    addCollider: (c) => city.colliders.push(c),
+  })
+
   const bottleData = buildLevel4BottleData()
   const bottleMeshes = createLevel4BottleMeshes(bottleData)
   city.group.add(bottleMeshes.group)
@@ -713,6 +719,8 @@ export function createLevel4Session(deps) {
   const update = (dt, started) => {
     if (!active) return
 
+    cityLife.update(dt)
+
     if (!started || gameOver || won) {
       navArrow.setVisible(false)
       return
@@ -734,6 +742,7 @@ export function createLevel4Session(deps) {
 
     navArrow.update(pos, nextNavTarget(), {
       dt,
+      yaw,
       visible: !puzzleView,
     })
 
@@ -867,6 +876,7 @@ export function createLevel4Session(deps) {
     valves.dispose()
     loadShed.dispose()
     billboards.dispose()
+    cityLife.dispose()
     tableMountain.dispose()
     city.dispose()
     scene.remove(sun.target)

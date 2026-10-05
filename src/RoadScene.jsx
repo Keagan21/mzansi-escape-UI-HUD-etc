@@ -6,6 +6,7 @@ import { GameHudHealth } from './components/GameHudHealth.jsx'
 import { GameOverBanner } from './components/GameOverBanner.jsx'
 import { GameplayHint } from './components/GameplayHint.jsx'
 import { LevelBriefing } from './components/LevelBriefing.jsx'
+import { Level6ContentWarning } from './components/Level6ContentWarning.jsx'
 import { Level3Objective } from './components/Level3Objective.jsx'
 import { Level4Objective } from './components/Level4Objective.jsx'
 import { Level5Objective } from './components/Level5Objective.jsx'
@@ -20,10 +21,10 @@ import { LoadingOverlay } from './components/LoadingOverlay.jsx'
 import { NewRecordToast } from './components/NewRecordToast.jsx'
 import { PauseMenu } from './components/PauseMenu.jsx'
 import { PauseToolbar } from './components/PauseToolbar.jsx'
-import { CutsceneOverlay } from './components/CutsceneOverlay.jsx'
 import { RoadSceneCanvas } from './components/RoadSceneCanvas.jsx'
 import { StartMenu } from './components/StartMenu.jsx'
 import { WalletHud } from './components/WalletHud.jsx'
+import { NavCompass } from './components/NavCompass.jsx'
 import { useAuth } from './AuthContext.jsx'
 import { CHARACTERS } from './game/characterAssets.js'
 import { setMusicMuted, startBgm, stopBgm } from './game/gameAudio.js'
@@ -75,6 +76,9 @@ export function RoadScene() {
   const [levelBriefingOpen, setLevelBriefingOpen] = useState(false)
   const levelBriefingOpenRef = useRef(false)
   const dismissLevelBriefingRef = useRef(() => {})
+  const [level6WarningOpen, setLevel6WarningOpen] = useState(false)
+  const level6WarningOpenRef = useRef(false)
+  const confirmLevel6WarningRef = useRef(() => {})
   const [selectedCharacterId, setSelectedCharacterId] = useState(
     readStoredCharacterId
   )
@@ -100,8 +104,6 @@ export function RoadScene() {
   })
   const [playStarted, setPlayStarted] = useState(false)
   const [level4HintDismissed, setLevel4HintDismissed] = useState(false)
-  const [cutscenePlaying, setCutscenePlaying] = useState(false)
-  const cutscenePlayingRef = useRef(false)
   const [musicMuted, setMusicMutedState] = useState(readStoredMusicMuted)
   const [autoForward, setAutoForwardState] = useState(readStoredAutoForward)
   const autoForwardRef = useRef(autoForward)
@@ -147,12 +149,12 @@ export function RoadScene() {
     }
   }, [setPaused])
   useLayoutEffect(() => {
-    if (levelBriefingOpen) {
+    if (levelBriefingOpen || level6WarningOpen) {
       pausedRef.current = true
       return
     }
     pausedRef.current = paused
-  }, [paused, levelBriefingOpen])
+  }, [paused, levelBriefingOpen, level6WarningOpen])
 
   useLayoutEffect(() => {
     levelBriefingOpenRef.current = levelBriefingOpen
@@ -265,18 +267,44 @@ export function RoadScene() {
     creditWalletRef.current = applyCreditWallet
   }, [applyCreditWallet])
 
+  const closeLevel6Warning = useCallback(() => {
+    level6WarningOpenRef.current = false
+    setLevel6WarningOpen(false)
+  }, [])
+
   const freezeForLevelBriefing = useCallback((levelNumber) => {
     if (getLevelBriefing(levelNumber)) {
       document.exitPointerLock?.()
       pausedRef.current = true
+      if (levelNumber === 6) {
+        level6WarningOpenRef.current = true
+        setLevel6WarningOpen(true)
+        levelBriefingOpenRef.current = false
+        setLevelBriefingOpen(false)
+        return true
+      }
+      level6WarningOpenRef.current = false
+      setLevel6WarningOpen(false)
       levelBriefingOpenRef.current = true
       setLevelBriefingOpen(true)
       return true
     }
     pausedRef.current = false
+    level6WarningOpenRef.current = false
+    setLevel6WarningOpen(false)
     levelBriefingOpenRef.current = false
     setLevelBriefingOpen(false)
     return false
+  }, [])
+
+  const confirmLevel6Warning = useCallback(() => {
+    if (!level6WarningOpenRef.current) return
+    level6WarningOpenRef.current = false
+    setLevel6WarningOpen(false)
+    document.exitPointerLock?.()
+    pausedRef.current = true
+    levelBriefingOpenRef.current = true
+    setLevelBriefingOpen(true)
   }, [])
 
   const dismissLevelBriefing = useCallback(() => {
@@ -292,12 +320,14 @@ export function RoadScene() {
     dismissLevelBriefingRef.current = dismissLevelBriefing
   }, [dismissLevelBriefing])
 
+  useLayoutEffect(() => {
+    confirmLevel6WarningRef.current = confirmLevel6Warning
+  }, [confirmLevel6Warning])
+
   const startGameplay = useCallback(
     (levelNumber) => {
       if (!isLevelPlayable(levelNumber)) return
       if (levelNumber === 1 && (hud.loading || hud.loadError)) return
-      cutscenePlayingRef.current = false
-      setCutscenePlaying(false)
       setMenuSelectedLevel(levelNumber)
       menuSelectedLevelRef.current = levelNumber
       setCurrentLevel(levelNumber)
@@ -349,22 +379,11 @@ export function RoadScene() {
     (levelNumber) => {
       if (!isLevelPlayable(levelNumber)) return
       if (levelNumber === 1 && (hud.loading || hud.loadError)) return
-      if (cutscenePlayingRef.current || playStartedRef.current) return
-      if (levelNumber === 1) {
-        cutscenePlayingRef.current = true
-        setCutscenePlaying(true)
-        return
-      }
+      if (playStartedRef.current) return
       startGameplay(levelNumber)
     },
     [hud.loadError, hud.loading, startGameplay]
   )
-
-  const finishCutscene = useCallback(() => {
-    cutscenePlayingRef.current = false
-    setCutscenePlaying(false)
-    startGameplay(1)
-  }, [startGameplay])
 
   const beginGame = useCallback(() => {
     beginGameAtLevel(menuSelectedLevelRef.current)
@@ -396,10 +415,11 @@ export function RoadScene() {
     pausedRef.current = false
     levelBriefingOpenRef.current = false
     setLevelBriefingOpen(false)
+    closeLevel6Warning()
     threeResetGameRef.current?.()
     setPaused(false)
     containerRef.current?.focus()
-  }, [])
+  }, [closeLevel6Warning])
 
   const backToMainMenuFromGame = useCallback(() => {
     clearMovementKeysRef.current()
@@ -407,11 +427,10 @@ export function RoadScene() {
     pausedRef.current = false
     levelBriefingOpenRef.current = false
     setLevelBriefingOpen(false)
+    closeLevel6Warning()
     gameStartedRef.current = false
     playStartedRef.current = false
     setPlayStarted(false)
-    cutscenePlayingRef.current = false
-    setCutscenePlaying(false)
     stopBgm()
     setNewRecordToast(false)
     setCurrentLevel(1)
@@ -427,7 +446,7 @@ export function RoadScene() {
       continueNotice: '',
     }))
     threeResetGameRef.current?.()
-  }, [])
+  }, [closeLevel6Warning])
 
   const signInToSaveFromWin = useCallback(() => {
     clearMovementKeysRef.current()
@@ -435,11 +454,10 @@ export function RoadScene() {
     pausedRef.current = false
     levelBriefingOpenRef.current = false
     setLevelBriefingOpen(false)
+    closeLevel6Warning()
     gameStartedRef.current = false
     playStartedRef.current = false
     setPlayStarted(false)
-    cutscenePlayingRef.current = false
-    setCutscenePlaying(false)
     stopBgm()
     setNewRecordToast(false)
     setHud((h) => ({
@@ -453,7 +471,7 @@ export function RoadScene() {
     }))
     threeResetGameRef.current?.()
     setMenuScreen('account')
-  }, [])
+  }, [closeLevel6Warning])
 
   const tryExit = useCallback(() => {
     window.close()
@@ -463,10 +481,11 @@ export function RoadScene() {
     pausedRef.current = false
     levelBriefingOpenRef.current = false
     setLevelBriefingOpen(false)
+    closeLevel6Warning()
     setPaused(false)
     threeResetGameRef.current?.()
     containerRef.current?.focus()
-  }, [])
+  }, [closeLevel6Warning])
 
   const nextLevelFromWin = useCallback(() => {
     const next = currentLevelRef.current + 1
@@ -580,6 +599,8 @@ export function RoadScene() {
     pausedRef,
     levelBriefingOpenRef,
     dismissLevelBriefingRef,
+    level6WarningOpenRef,
+    confirmLevel6WarningRef,
     highScoreRef,
     recordBaselineRef,
     newRecordToastShownRef,
@@ -603,7 +624,7 @@ export function RoadScene() {
     <>
       {hud.loading && <LoadingOverlay />}
       {hud.loadError && <LoadErrorOverlay />}
-      {!hud.loading && !hud.loadError && !playStarted && !cutscenePlaying && (
+      {!hud.loading && !hud.loadError && !playStarted && (
         <StartMenu
           menuScreen={menuScreen}
           onBeginGame={beginGame}
@@ -624,9 +645,12 @@ export function RoadScene() {
           onBuyStoreItem={buyStoreItem}
         />
       )}
-      {cutscenePlaying && <CutsceneOverlay onComplete={finishCutscene} />}
+      {playStarted && level6WarningOpen && !hud.levelComplete && !hud.gameOver && (
+        <Level6ContentWarning />
+      )}
       {playStarted &&
         levelBriefingOpen &&
+        !level6WarningOpen &&
         !hud.levelComplete &&
         !hud.gameOver && (
           <LevelBriefing
@@ -639,7 +663,8 @@ export function RoadScene() {
         !hud.levelComplete &&
         !hud.gameOver &&
         !paused &&
-        !levelBriefingOpen && (
+        !levelBriefingOpen &&
+        !level6WarningOpen && (
         <GameplayHint
           level={currentLevel}
           autoForward={autoForward}
@@ -660,10 +685,12 @@ export function RoadScene() {
         !hud.gameOver &&
         !hud.levelComplete &&
         !paused &&
-        !levelBriefingOpen && <PauseToolbar onPause={openPauseMenu} />}
+        !levelBriefingOpen &&
+        !level6WarningOpen && <PauseToolbar onPause={openPauseMenu} />}
       {playStarted &&
         paused &&
         !levelBriefingOpen &&
+        !level6WarningOpen &&
         !hud.gameOver &&
         !hud.levelComplete && (
         <PauseMenu
@@ -812,7 +839,8 @@ export function RoadScene() {
         !hud.levelComplete &&
         !hud.gameOver &&
         !paused &&
-        !levelBriefingOpen && (
+        !levelBriefingOpen &&
+        !level6WarningOpen && (
           <Level6Objective
             distance={hud.distanceToGoal}
             runTimeMs={hud.runTimeMs ?? 0}
@@ -867,7 +895,9 @@ export function RoadScene() {
         !hud.gameOver &&
         !hud.levelComplete &&
         !paused &&
-        !levelBriefingOpen && <WalletHud balance={walletBalance} />}
+        !levelBriefingOpen &&
+        !level6WarningOpen && <WalletHud balance={walletBalance} />}
+      <NavCompass />
       {playStarted &&
         currentLevel !== 3 &&
         currentLevel !== 4 &&

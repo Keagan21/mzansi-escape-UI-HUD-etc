@@ -115,6 +115,8 @@ export function useRoadSceneEngine({
   pausedRef,
   levelBriefingOpenRef,
   dismissLevelBriefingRef,
+  level6WarningOpenRef,
+  confirmLevel6WarningRef,
   highScoreRef,
   recordBaselineRef,
   newRecordToastShownRef,
@@ -1428,6 +1430,7 @@ export function useRoadSceneEngine({
       playStartedRef.current &&
       !pausedRef.current &&
       !levelBriefingOpenRef?.current &&
+      !level6WarningOpenRef?.current &&
       !game.over &&
       !game.won
 
@@ -1457,6 +1460,13 @@ export function useRoadSceneEngine({
             startFromMenuRef.current?.()
             containerRef.current?.focus()
           }
+        }
+        return
+      }
+      if (level6WarningOpenRef?.current) {
+        e.preventDefault()
+        if (e.code === 'Enter' && !e.repeat) {
+          confirmLevel6WarningRef.current?.()
         }
         return
       }
@@ -1535,6 +1545,7 @@ export function useRoadSceneEngine({
     }
 
     const onKeyUp = (e) => {
+      if (level6WarningOpenRef?.current || levelBriefingOpenRef?.current) return
       const level = getLevelConfig(currentLevelRef.current)
       if (level.playerKind === 'openworld') {
         openWorldSession().handleKeyUp(e.code)

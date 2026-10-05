@@ -905,6 +905,7 @@ export function createLevel5Session(deps) {
 
     navArrow.update(pos, nextNavTarget(), {
       dt,
+      yaw,
       visible: !puzzleView,
     })
 

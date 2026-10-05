@@ -16,7 +16,6 @@ import {
   stripHipRootMotion,
 } from '../mixamoAnimation.js'
 import {
-  LEVEL6_SOUND_RADIUS_SPRINT,
   LEVEL6_THREAT_COUNT as THREAT_COUNT_CONST,
   LEVEL6_VISION_ANGLE as VISION_ANGLE_CONST,
   LEVEL6_VISION_RANGE as VISION_RANGE_CONST,
@@ -45,7 +44,7 @@ const SIGHT_H_STANDING = 1.6
 const SIGHT_H_CROUCHED = 1.0
 
 const CONE_COLOR = 0xff3300
-const CONE_OPACITY = 0.13
+const CONE_OPACITY = 0.32
 const CONE_ALERT_COLOR = 0xff0000
 const CONE_ALERT_OPACITY = 0.35
 const SILHOUETTE_COLOR = 0x222230
@@ -527,19 +526,14 @@ export function updateLevel6Threats(threats, ctx) {
  * @param {Threat} threat
  * @param {{ x: number, z: number, crouching: boolean, sprinting: boolean, moving: boolean }} player
  * @param {SightBlocker[]} blockers
- * @returns {'sight' | 'sound' | 'close' | null}
+ * @returns {'sight' | 'close' | null}
  */
 export function detectPlayer(threat, player, blockers) {
   const dx = player.x - threat.x
   const dz = player.z - threat.z
   const dist = Math.hypot(dx, dz)
 
-  // The red cone is the spot. Walking past the side of a patrol is safe.
-  // Sprinting is loud in every direction.
-  if (player.moving && player.sprinting && !player.crouching && dist < LEVEL6_SOUND_RADIUS_SPRINT) {
-    return 'sound'
-  }
-
+  // Same wedge the red cone draws: heading, angle, and range.
   const sightH = player.crouching ? SIGHT_H_CROUCHED : SIGHT_H_STANDING
   const range = player.crouching ? LEVEL6_CROUCH_VISION_RANGE : LEVEL6_VISION_RANGE
   if (dist < range) {

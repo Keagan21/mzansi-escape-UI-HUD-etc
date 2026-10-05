@@ -103,7 +103,14 @@ service cloud.firestore {
         && request.resource.data.unlocks.characters is list
         && request.resource.data.unlocks.cars is list
         && request.resource.data.unlocks.characters.size() <= 32
-        && request.resource.data.unlocks.cars.size() <= 32;
+        && request.resource.data.unlocks.cars.size() <= 32
+        && (
+          !request.resource.data.keys().hasAny(['levelBests'])
+          || (
+            request.resource.data.levelBests is map
+            && request.resource.data.levelBests.size() <= 16
+          )
+        );
     }
 
     // Wallet, store unlocks, and selected character/car — owner only

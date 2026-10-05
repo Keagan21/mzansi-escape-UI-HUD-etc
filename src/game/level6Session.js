@@ -38,6 +38,7 @@ import {
   updateLevel6TipMeshes,
 } from './level6Collectibles.js'
 import { playCoinPickup, playIncorrectBuzzer, playLevelComplete } from './gameAudio.js'
+import { createNavArrow } from './navArrow.js'
 import { sanitizeStoredBest, submitBestScore } from './scores.js'
 import { levelHighScoreKey } from './storageKeys.js'
 import {
@@ -137,6 +138,7 @@ export function createLevel6Session(deps) {
   void recordBaselineRef
 
   const city = buildCapeFlatsCity(scene)
+  const navArrow = createNavArrow(city.group, { color: 0x44ff88 })
   const threats = createLevel6Threats(city.group)
   const tipData = buildLevel6TipData()
   const tipMeshes = createLevel6TipMeshes(tipData)
@@ -220,6 +222,9 @@ export function createLevel6Session(deps) {
     nz = Math.max(LEVEL6_WORLD_BOUNDS.minZ, Math.min(LEVEL6_WORLD_BOUNDS.maxZ, nz))
     return { x: nx, z: nz }
   }
+
+  const level6NavTarget = () =>
+    LEVEL6_CHECKPOINTS[furthestCheckpoint + 1] ?? LEVEL6_ANCHORS.careCentre
 
   const navigatorMessage = () => {
     if (won) return LEVEL6_NAVIGATOR.win
@@ -488,6 +493,7 @@ export function createLevel6Session(deps) {
       void preloadLevel6Threats()
     } else {
       clearKeys()
+      navArrow.setVisible(false)
       if (playerRoot) playerRoot.scale.set(1, 1, 1)
       camera.fov = 60
       camera.updateProjectionMatrix()
@@ -572,6 +578,7 @@ export function createLevel6Session(deps) {
     if (frozen) {
       movingNow = false
       sprintingNow = false
+      navArrow.setVisible(false)
       return
     }
 
@@ -582,6 +589,7 @@ export function createLevel6Session(deps) {
       respawnMs -= dt * 1000
       movingNow = false
       sprintingNow = false
+      navArrow.update(pos, level6NavTarget(), { dt, yaw: Math.PI })
       if (respawnMs <= 0) {
         respawnMs = 0
         respawnAtCheckpoint()
@@ -640,6 +648,7 @@ export function createLevel6Session(deps) {
     }
 
     const goal = LEVEL6_ANCHORS.careCentre
+    navArrow.update(pos, level6NavTarget(), { dt, yaw: Math.PI })
     if (Math.hypot(pos.x - goal.x, pos.z - goal.z) < LEVEL6_WIN_RADIUS) {
       completeLevel()
       return
@@ -676,6 +685,7 @@ export function createLevel6Session(deps) {
   }
 
   const dispose = () => {
+    navArrow.dispose()
     container.removeEventListener('mousedown', onMouseDown)
     disposeLevel6Threats(threats, city.group)
     city.group.remove(tipMeshes.group)

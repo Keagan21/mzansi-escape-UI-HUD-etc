@@ -316,10 +316,15 @@ export function buildJoburgCbdCity(scene) {
   buildBrutalistBuilding(-BLOCK * 2.5, -BLOCK * 0.8)
 
   const half = GRID_N / 2
+  const parkLot = computeParkStationPlacement()
+  // Keep a full block clear around the station. Lot splits are random, so a
+  // mid-rise was landing on the checkpoint and hiding the GLB on some runs.
+  const parkClear = PARK_STATION_TARGET_SIZE / 2 + BLOCK * 0.55
   for (let ix = -half; ix < half; ix++) {
     for (let iz = -half; iz < half; iz++) {
       const bx = (ix + 0.5) * BLOCK
       const bz = (iz + 0.5) * BLOCK
+      if (Math.hypot(bx - parkLot.x, bz - parkLot.z) < parkClear) continue
       if (
         Math.abs(bx - -BLOCK * 0.3) < BLOCK * 0.6 &&
         Math.abs(bz - -BLOCK * 0.3) < BLOCK * 0.6
