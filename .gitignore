@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+/node_modules
+dist
+dist-ssr
+*.local
+*.bak
+*.glb.bak
+src/game.zip
+Characters/Level3Assets/ParkStation.glb
+Characters/Level3Characters/*
+!Characters/Level3Characters/*.glb
+Characters/PlayerCharacters/*
+!Characters/PlayerCharacters/*.glb
+Characters/Level5Assets/*
+!Characters/Level5Assets/*.glb
+!Characters/Level5Assets/README.txt
+public/*
+!public/media/
+!public/media/**
+!public/cutscenes/
+!public/cutscenes/**
+!public/game audio/
+!public/game audio/**
+!public/Level8Assets/
+!public/Level8Assets/**
+!public/*.glb
+!public/*.svg
+!public/*.html
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

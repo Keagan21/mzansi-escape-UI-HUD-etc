@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function scoreKind() {
+      return request.resource.data.keys().hasAny(['scoreKind'])
+        ? request.resource.data.scoreKind
+        : 'points';
+    }
+
+    function isTimeScore() {
+      return scoreKind() == 'time';
+    }
+
+    function validScoreWrite() {
+      return request.resource.data.keys().hasAll(['bestScore', 'levelId', 'displayName', 'updatedAt'])
+        && request.resource.data.bestScore is number
+        && request.resource.data.bestScore >= 0
+        && request.resource.data.levelId is number
+        && request.resource.data.levelId >= 1
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 80
+        && (scoreKind() == 'points' || scoreKind() == 'time');
+    }
+
+    function existingIsTime() {
+      return resource.data.keys().hasAny(['scoreKind'])
+        && resource.data.scoreKind == 'time';
+    }
+
+    function beatsExistingBest() {
+      return !resource.exists
+        || (
+          isTimeScore()
+            ? (
+                !existingIsTime()
+                || resource.data.bestScore <= 0
+                || resource.data.bestScore < 1000
+                || request.resource.data.bestScore <= resource.data.bestScore
+              )
+            : request.resource.data.bestScore >= resource.data.bestScore
+        );
+    }
+
+    // Personal bests — owner can list/get/write their level docs
+    match /scores/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    match /scores/{uid}/levels/{levelId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && validScoreWrite()
+        && beatsExistingBest();
+      allow delete: if false;
+    }
+
+    // Global leaderboard — public read; players write only their own entry
+    match /leaderboards/{levelId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /leaderboards/{levelId}/entries/{uid} {
+      allow read: if true;
+      allow create, update: if isOwner(uid)
+        && validScoreWrite()
+        && request.resource.data.uid == uid
+        && beatsExistingBest();
+      allow delete: if false;
+    }
+
+    function validProgressWrite() {
+      return request.resource.data.keys().hasAll([
+          'wallet',
+          'unlocks',
+          'selectedCharacterId',
+          'selectedLevel2CarId',
+          'clientUpdatedAt',
+          'updatedAt'
+        ])
+        && request.resource.data.wallet is number
+        && request.resource.data.wallet >= 0
+        && request.resource.data.wallet <= 1000000000
+        && request.resource.data.selectedCharacterId is string
+        && request.resource.data.selectedCharacterId.size() > 0
+        && request.resource.data.selectedCharacterId.size() <= 80
+        && request.resource.data.selectedLevel2CarId is string
+        && request.resource.data.selectedLevel2CarId.size() > 0
+        && request.resource.data.selectedLevel2CarId.size() <= 80
+        && request.resource.data.clientUpdatedAt is number
+        && request.resource.data.clientUpdatedAt >= 0
+        && request.resource.data.unlocks.keys().hasAll(['characters', 'cars'])
+        && request.resource.data.unlocks.characters is list
+        && request.resource.data.unlocks.cars is list
+        && request.resource.data.unlocks.characters.size() <= 32
+        && request.resource.data.unlocks.cars.size() <= 32;
+    }
+
+    // Wallet, store unlocks, and selected character/car — owner only
+    match /players/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validProgressWrite();
+      allow delete: if false;
+    }
+  }
+}
