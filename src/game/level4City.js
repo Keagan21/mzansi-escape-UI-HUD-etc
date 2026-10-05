@@ -25,8 +25,8 @@ export const LEVEL4_ANCHORS = {
   newlands: { x: -BLOCK * 2.4, z: -BLOCK * 2.8 },
   steenbras: { x: BLOCK * 3.5, z: -BLOCK * 4.2 },
   tableMountain: { x: 0, z: LEVEL4_WORLD_BOUND + 180 },
-  /** Win destination — Vodacom Building (was V&A Waterfront). */
-  vodacom: { x: -BLOCK * 3.2, z: BLOCK * 1.8 },
+  /** Win destination — middle of the block, clear of the crossing. */
+  vodacom: { x: -BLOCK * 3.5, z: BLOCK * 1.5 },
   /** Lot beside the street ahead of spawn, off the roadway. */
   mcdonalds: { x: BLOCK * 0.5, z: BLOCK * 2.5 },
 }
@@ -282,7 +282,7 @@ function attachSteenbrasPowerStation(pad, x, z, registerCollider) {
 function attachVodacomBuilding(pad, x, z, registerCollider) {
   const hold = new THREE.Group()
   hold.name = 'vodacom-building'
-  hold.position.set(0, 0, -2)
+  hold.position.set(0, 0, 0)
   pad.add(hold)
 
   let cancelled = false
@@ -299,7 +299,7 @@ function attachVodacomBuilding(pad, x, z, registerCollider) {
     hutMesh.position.set(0, 2.7, 0)
     hutMesh.castShadow = true
     hold.add(hutMesh)
-    registerCollider(x - 2, z - 2, 8, 7, 5)
+    registerCollider(x, z, 8, 7, 5)
   }
 
   loadVodacomBuildingTemplate().then(() => {
