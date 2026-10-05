@@ -14,6 +14,8 @@ import {
   rebaseClipOntoBindPose,
   retargetClipToBones,
   retargetClipToRoot,
+  retargetClipWorldSpace,
+  rigRestDiffers,
   stripHipRootMotion,
   canonicalBoneKey,
 } from '../mixamoAnimation.js'
@@ -807,6 +809,8 @@ export function useRoadSceneEngine({
     let torchWalkClip = null
     /** Canonical bone name -> rest quaternion from TorchWalk.glb. */
     let torchRestByBone = new Map()
+    /** Rest-pose armature the torch clip was authored on. */
+    let torchSourceRoot = null
     let playerMixer = null
     let playerRunAction = null
     /** @type {THREE.AnimationAction | null} */
@@ -871,7 +875,7 @@ export function useRoadSceneEngine({
 
     let torchLoadPromise = null
     const loadTorchWalk = () => {
-      if (torchWalkClip && torchRestByBone.size) return Promise.resolve(torchWalkClip)
+      if (torchWalkClip && torchRestByBone.size && torchSourceRoot) return Promise.resolve(torchWalkClip)
       if (torchLoadPromise) return torchLoadPromise
       torchLoadPromise = new Promise((resolve, reject) => {
         loader.load(
@@ -884,6 +888,7 @@ export function useRoadSceneEngine({
               if (key && !rest.has(key)) rest.set(key, o.quaternion.clone())
             })
             torchRestByBone = rest
+            torchSourceRoot = gltf.scene
             torchWalkClip = pickLocomotionClip(gltf.animations)
             resolve(torchWalkClip)
           },
@@ -986,16 +991,26 @@ export function useRoadSceneEngine({
 
       const bindLoco = (source, name, restByBone) => {
         if (!source) return null
-        const fit = (clip) =>
-          restByBone?.size
-            ? rebaseClipOntoBindPose(clip, restByBone, charBindPose)
-            : clip
-        const retargeted = fit(stripHipRootMotion(retargetClipToRoot(source, model)))
+        const useWorldRetarget =
+          restByBone?.size &&
+          torchSourceRoot &&
+          rigRestDiffers(restByBone, charBindPose)
+        const retargeted = useWorldRetarget
+          ? retargetClipWorldSpace(source, torchSourceRoot, model)
+          : (restByBone?.size
+              ? rebaseClipOntoBindPose(
+                  stripHipRootMotion(retargetClipToRoot(source, model)),
+                  restByBone,
+                  charBindPose
+                )
+              : stripHipRootMotion(retargetClipToRoot(source, model)))
         if (retargeted.tracks.length === 0) {
           // Kenney / older skins: fall back to first skinned mesh bone map.
-          const fallback = fit(
-            stripHipRootMotion(retargetClipToBones(source, sm.skeleton))
-          )
+          const mapped = stripHipRootMotion(retargetClipToBones(source, sm.skeleton))
+          const fallback =
+            restByBone?.size && !useWorldRetarget
+              ? rebaseClipOntoBindPose(mapped, restByBone, charBindPose)
+              : mapped
           if (fallback.tracks.length === 0) {
             if (import.meta.env.DEV) {
               console.warn(

@@ -213,6 +213,169 @@ export function rebaseClipOntoBindPose(clip, sourceRest, targetRest) {
   return new THREE.AnimationClip(clip.name || 'loco', clip.duration, tracks)
 }
 
+/** Mixamo spine/toe names that correspond to the Kenney rig. */
+const WORLD_RETARGET_ALIASES = {
+  spine1: 'chest',
+  spine2: 'upperchest',
+  lefttoebase: 'lefttoes',
+  righttoebase: 'righttoes',
+}
+
+/**
+ * True when the target skeleton's hip bind is far from the clip's hip bind.
+ * Kenney hips rest at 180° around Z; Mixamo hips rest near identity.
+ * @param {Map<string, THREE.Quaternion>} sourceRest
+ * @param {Record<string, THREE.Quaternion>} targetRest
+ */
+export function rigRestDiffers(sourceRest, targetRest) {
+  const sourceHips = sourceRest?.get?.('hips')
+  if (!sourceHips || !targetRest) return false
+  const targetName = Object.keys(targetRest).find((name) => canonicalBoneKey(name) === 'hips')
+  const targetHips = targetName ? targetRest[targetName] : null
+  if (!targetHips) return false
+  return Math.abs(sourceHips.dot(targetHips)) < 0.92
+}
+
+/**
+ * Bake a clip onto another skeleton by transferring each joint's world-space
+ * swing from its own rest pose. Local rebasing leaves Kenney limbs on the
+ * wrong axis because that rig's bind rotations do not match Mixamo.
+ * @param {THREE.AnimationClip} clip
+ * @param {THREE.Object3D} sourceRoot rest pose of the clip's rig
+ * @param {THREE.Object3D} targetRoot rest pose of the character
+ * @param {number} [fps]
+ */
+export function retargetClipWorldSpace(clip, sourceRoot, targetRoot, fps = 30) {
+  if (!clip?.tracks?.length || !sourceRoot || !targetRoot) {
+    return new THREE.AnimationClip(clip?.name || 'loco', clip?.duration || 0, [])
+  }
+  sourceRoot.updateMatrixWorld(true)
+  targetRoot.updateMatrixWorld(true)
+
+  /** @type {Map<string, THREE.Object3D>} */
+  const sourceByKey = new Map()
+  /** @type {THREE.Object3D[]} */
+  const sourceNodes = []
+  sourceRoot.traverse((o) => {
+    if (!o.name || o.isMesh || o.isCamera || o.isLight) return
+    sourceNodes.push(o)
+    const key = canonicalBoneKey(o.name)
+    if (key && !sourceByKey.has(key)) sourceByKey.set(key, o)
+  })
+  /** @type {THREE.Bone[]} */
+  const targetBones = []
+  targetRoot.traverse((o) => {
+    if (o.isBone) targetBones.push(o)
+  })
+
+  const sourceRestWorld = new Map()
+  const sourceBindLocal = new Map()
+  const q = new THREE.Quaternion()
+  for (const node of sourceNodes) {
+    sourceBindLocal.set(node, node.quaternion.clone())
+    const key = canonicalBoneKey(node.name)
+    if (!key || sourceRestWorld.has(key)) continue
+    node.getWorldQuaternion(q)
+    sourceRestWorld.set(key, q.clone())
+  }
+  const targetRestWorld = new Map()
+  const targetBindLocal = new Map()
+  for (const bone of targetBones) {
+    targetBindLocal.set(bone, bone.quaternion.clone())
+    bone.getWorldQuaternion(q)
+    targetRestWorld.set(bone, q.clone())
+  }
+
+  const sourceFor = (bone) => {
+    const key = canonicalBoneKey(bone.name)
+    if (sourceByKey.has(key)) return sourceByKey.get(key)
+    for (const [src, dst] of Object.entries(WORLD_RETARGET_ALIASES)) {
+      if (dst === key && sourceByKey.has(src)) return sourceByKey.get(src)
+    }
+    return null
+  }
+
+  const driven = targetBones.filter((bone) => sourceFor(bone))
+  const frames = Math.max(2, Math.round(clip.duration * fps))
+  const times = []
+  for (let i = 0; i < frames; i++) times.push((clip.duration * i) / frames)
+  times.push(clip.duration)
+
+  const mixer = new THREE.AnimationMixer(sourceRoot)
+  const action = mixer.clipAction(clip)
+  action.setLoop(THREE.LoopRepeat, Infinity)
+  action.play()
+
+  const values = new Map(driven.map((bone) => [bone, []]))
+  const prev = new Map()
+  const parentQ = new THREE.Quaternion()
+  const desired = new THREE.Quaternion()
+  const local = new THREE.Quaternion()
+
+  const poseFrame = (time) => {
+    mixer.setTime(time)
+    sourceRoot.updateMatrixWorld(true)
+    for (const bone of targetBones) bone.quaternion.copy(targetBindLocal.get(bone))
+    targetRoot.updateMatrixWorld(true)
+    for (const bone of targetBones) {
+      const src = sourceFor(bone)
+      if (!src) continue
+      const ws = new THREE.Quaternion()
+      src.getWorldQuaternion(ws)
+      const srcKey = canonicalBoneKey(src.name)
+      desired
+        .copy(ws)
+        .multiply(sourceRestWorld.get(srcKey).clone().invert())
+        .multiply(targetRestWorld.get(bone))
+      if (bone.parent?.getWorldQuaternion) bone.parent.getWorldQuaternion(parentQ)
+      else parentQ.identity()
+      local.copy(parentQ).invert().multiply(desired).normalize()
+      const earlier = prev.get(bone)
+      if (earlier && earlier.dot(local) < 0) {
+        local.x = -local.x
+        local.y = -local.y
+        local.z = -local.z
+        local.w = -local.w
+      }
+      prev.set(bone, local.clone())
+      bone.quaternion.copy(local)
+      bone.updateMatrixWorld(true)
+      values.get(bone).push(local.x, local.y, local.z, local.w)
+    }
+  }
+
+  for (let i = 0; i < frames; i++) poseFrame(times[i])
+  for (const bone of driven) {
+    const buf = values.get(bone)
+    const end = new THREE.Quaternion(buf[0], buf[1], buf[2], buf[3])
+    const last = new THREE.Quaternion(
+      buf[buf.length - 4],
+      buf[buf.length - 3],
+      buf[buf.length - 2],
+      buf[buf.length - 1]
+    )
+    if (last.dot(end) < 0) {
+      end.x = -end.x
+      end.y = -end.y
+      end.z = -end.z
+      end.w = -end.w
+    }
+    buf.push(end.x, end.y, end.z, end.w)
+  }
+
+  mixer.stopAllAction()
+  for (const [node, quat] of sourceBindLocal) node.quaternion.copy(quat)
+  for (const [bone, quat] of targetBindLocal) bone.quaternion.copy(quat)
+  sourceRoot.updateMatrixWorld(true)
+  targetRoot.updateMatrixWorld(true)
+
+  const tracks = []
+  for (const bone of driven) {
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${bone.name}.quaternion`, times, values.get(bone)))
+  }
+  return new THREE.AnimationClip(clip.name || 'loco', clip.duration, tracks)
+}
+
 /**
  * Remaps {@link AnimationClip} tracks from one rig's naming convention to
  * {@link THREE.Skeleton} bone names on the target character.
